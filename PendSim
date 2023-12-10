@@ -1,0 +1,179 @@
+//==================================================================
+// PendSim.cs : Defines derived class for simulating a
+//==================================================================
+using System;
+
+public class PendSim : Simulator
+{private double L;            // pendulum length
+    private double g;            // grav field strength
+    private int n;
+    private double[] x;          // array of states
+    private double[] xA;         // intermediate state
+    private double[][] f;        // array of array of slopes
+
+
+    public PendSim() : base(6)
+    {
+        L = 1.0;
+        g = 9.81;
+        n = 6; // Updated for rotational dynamics
+        x = new double[n];
+        xA = new double[n];
+        f = new double[4][]; // Updated for RK4
+
+        for (int i = 0; i < 4; ++i)
+        {
+            f[i] = new double[n];
+        }
+
+        // Initial conditions for the springy pendulum
+        x[0] = -0.7;   // Initial x position
+        x[1] = -0.2;   // Initial y position
+        x[2] = -0.5;   // Initial z position
+        x[3] = 0.0;    // Initial x velocity
+        x[4] = 0.0;    // Initial y velocity
+        x[5] = 0.9;    // Initial z velocity
+    }
+
+    //----------------------------------------------------
+    // CalculatePotentialEnergy: calculate potential energy
+    //----------------------------------------------------
+    public double CalculatePotentialEnergy()
+    {
+        double m = 1.4;       // Mass of the pendulum
+        double g = 9.81;      // Gravitational strength
+        double L0 = 1.0;      // Resting length of the spring
+        double k = 90.0;
+        double L = Math.Sqrt(x[0] * x[0] + x[1] * x[1] + x[2] * x[2]); // Length of the spring
+       double potentialEnergy = m * g * x[1] + 0.5 * k * Math.Pow((L - L0), 2);
+
+
+        return potentialEnergy;
+    }
+
+    //----------------------------------------------------
+    // CalculateKineticEnergy: calculate kinetic energy
+    //----------------------------------------------------
+    public double CalculateKineticEnergy()
+    {
+        double m = 1.4;       // Mass of the pendulum
+        double kineticEnergy = 0.5 * m * (x[3] * x[3] + x[4] * x[4] + x[5] * x[5]);
+        return kineticEnergy;
+    }
+
+    //----------------------------------------------------
+    // CalculateTotalEnergy: calculate total energy
+    //----------------------------------------------------
+    public double CalculateTotalEnergy()
+    {
+        double totalEnergy = CalculatePotentialEnergy() + CalculateKineticEnergy();
+        return totalEnergy;
+    }
+
+    //----------------------------------------------------
+    // StepEuler: completes one Euler step in solving
+    // equations of motion
+    //----------------------------------------------------
+    public void StepEuler(double time, double dt)
+    {
+        int i;
+        RHSFuncSpringyPendulum(x, time, f[0]);
+        for (i = 0; i < n; ++i)
+        {
+            x[i] += f[0][i] * dt;
+        }
+    }
+
+    //----------------------------------------------------
+    // StepRK4: completes one RK4 step in solving
+    // equations of motion
+    //----------------------------------------------------
+    public void StepRK4(double time, double dt)
+    {
+        int i;
+        RHSFuncSpringyPendulum(x, time, f[0]);
+        for (i = 0; i < n; ++i)
+        {
+            xA[i] = x[i] + 0.5 * f[0][i] * dt;
+        }
+        RHSFuncSpringyPendulum(xA, time + 0.5 * dt, f[1]);
+        for (i = 0; i < n; ++i)
+        {
+            xA[i] = x[i] + 0.5 * f[1][i] * dt;
+        }
+        RHSFuncSpringyPendulum(xA, time + 0.5 * dt, f[2]);
+        for (i = 0; i < n; ++i)
+        {
+            xA[i] = x[i] + f[2][i] * dt;
+        }
+        RHSFuncSpringyPendulum(xA, time + dt, f[3]);
+        for (i = 0; i < n; ++i)
+        {
+            x[i] = x[i] + (1.0 / 6.0) * (f[0][i] + 2.0 * f[1][i] + 2.0 * f[2][i] + f[3][i]) * dt;
+        }
+    }
+
+    //----------------------------------------------------
+    // RHSFuncSpringyPendulum
+    //----------------------------------------------------
+    private void RHSFuncSpringyPendulum(double[] xx, double t, double[] ff)
+    {
+        double m = 1.4;       // Mass of the pendulum
+        double k = 90.0;      // Spring constant
+        double g = 9.81;      // Gravitational strength
+        double L = Math.Sqrt(xx[0] * xx[0] + xx[1] * xx[1] + xx[2] * xx[2]); // Length of the spring
+        double L0 = 0.9;      // Resting length of the spring
+
+        // Calculate the spring force
+        double Fspring_x = -k * (L - L0) * xx[0] / L;
+        double Fspring_y = -k * (L - L0) * xx[1] / L;
+        double Fspring_z = -k * (L - L0) * xx[2] / L;
+
+        // Calculate the gravitational force
+        double Fgrav_y = -m * g;
+
+        // Calculate the acceleration
+        ff[0] = xx[3];              // xDot
+        ff[1] = xx[4];              // yDot
+        ff[2] = xx[5];              // zDot
+        ff[3] = Fspring_x / m;      // x acceleration
+        ff[4] = (Fspring_y + Fgrav_y) / m;  // y acceleration
+        ff[5] = Fspring_z / m;      // z acceleration
+    }
+
+    public double X
+    {
+        get { return x[0]; }
+        set { x[0] = value; }
+    }
+
+    public double Y
+    {
+        get { return x[1]; }
+        set { x[1] = value; }
+    }
+
+    public double Z
+    {
+        get { return x[2]; }
+        set { x[2] = value; }
+    }
+
+    public double XDot
+    {
+        get { return x[3]; }
+        set { x[3] = value; }
+    }
+
+    public double YDot
+    {
+        get { return x[4]; }
+        set { x[4] = value; }
+    }
+
+    public double ZDot
+    {
+        get { return x[5]; }
+        set { x[5] = value; }
+    }
+}
